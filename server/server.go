@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2021-2024  The YNOproject Developers
+	Copyright (C) 2021-2025  The YNOproject Developers
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU Affero General Public License as published by
@@ -79,6 +79,12 @@ func Start() {
 
 	serverSecurity = security.New()
 	assets = getAssets(config.gamePath)
+
+	cliArgs := flag.Args()
+	if len(cliArgs) == 2 && cliArgs[0] == "manage" {
+		cliManage(cliArgs[1])
+		return
+	}
 
 	setConditions()
 	setBadges()

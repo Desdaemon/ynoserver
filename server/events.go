@@ -72,8 +72,9 @@ type EventsData struct {
 }
 
 type EventLocationData struct {
-	Title    string   `json:"title"`
-	TitleJP  string   `json:"titleJP,omitempty"`
+	Title   string `json:"title"`
+	TitleJP string `json:"titleJP,omitempty"`
+	// depth in star difficulty, 0 - 10
 	Depth    int      `json:"depth"`
 	MinDepth int      `json:"minDepth"`
 	FgColor  string   `json:"fgColor"`
@@ -515,6 +516,16 @@ func setEventVms() {
 	}
 }
 
+func loadEventLocations(path string) (output []*EventLocationData, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(data, &output)
+	return
+}
+
 func setGameEventLocationPoolsAndLocationColors() {
 	if isMainServer {
 		gameDailyEventLocationPools = make(map[string][]*EventLocationData)
@@ -542,14 +553,9 @@ func setGameEventLocationPoolsAndLocationColors() {
 	for _, gameId := range gameIds {
 		var eventLocations []*EventLocationData
 
-		data, err := os.ReadFile(configPath + gameId + ".json")
+		eventLocations, err := loadEventLocations(configPath + gameId + ".json")
 		if err != nil {
 			gameEventLocations[gameId] = nil
-			continue
-		}
-
-		err = json.Unmarshal(data, &eventLocations)
-		if err != nil {
 			continue
 		}
 

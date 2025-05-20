@@ -618,12 +618,8 @@ func getGameLocationByName(locationName string) (gameLocation GameLocation, err 
 		}
 
 		if !matchingEventLocation.syncdb {
-			if dbHasData {
-				_, err = db.Exec("UPDATE gameLocations SET title = ?, titleJP = ?, depth = ?, minDepth = ?, mapIds = ? WHERE id = ?", matchingEventLocation.Title, matchingEventLocation.TitleJP, matchingEventLocation.Depth, matchingEventLocation.MinDepth, mapIdsJson, gameLocation.Id)
-				if err != nil {
-					return
-				}
-			} else {
+			// don't update depths here, games other than 2kki already have a locations file
+			if !dbHasData {
 				var res sql.Result
 				var locationId int64
 
