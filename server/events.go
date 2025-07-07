@@ -67,9 +67,16 @@ type EventVm struct {
 	Complete bool      `json:"complete"`
 }
 
+type EventTrial struct {
+	Id      int       `json:"id"`
+	Game    string    `json:"game"`
+	EndDate time.Time `json:"endDate"`
+}
+
 type EventsData struct {
 	Locations []*EventLocation `json:"locations"`
 	Vms       []*EventVm       `json:"vms"`
+	Trials    []*EventTrial    `json:"trials"`
 }
 
 type EventLocationData struct {
@@ -131,6 +138,15 @@ const (
 
 	weekend2kkiEventLocationMinDepth = 9
 	weekend2kkiEventLocationMaxDepth = 14
+)
+
+type EventType int
+
+const (
+	eventDaily EventType = iota
+	eventWeekly
+	eventWeekend
+	eventManual
 )
 
 var (
@@ -216,6 +232,7 @@ func initEvents() {
 		case time.Sunday:
 			addWeeklyEventLocation()
 			addEventVm()
+			addWeeklyEventTrial()
 			eventsCount += 2
 		case time.Tuesday:
 			addEventVm()
@@ -331,15 +348,15 @@ func addDailyEventLocation(deeper bool) {
 
 	if gameId == "2kki" {
 		if !deeper {
-			add2kkiEventLocation(0, daily2kkiEventLocationMinDepth, daily2kkiEventLocationMaxDepth, dailyEventLocationExp)
+			add2kkiEventLocation(0, daily2kkiEventLocationMinDepth, daily2kkiEventLocationMaxDepth, dailyEventLocationExp, false)
 		} else {
-			add2kkiEventLocation(0, daily2kkiEventLocation2MinDepth, daily2kkiEventLocation2MaxDepth, dailyEventLocation2Exp)
+			add2kkiEventLocation(0, daily2kkiEventLocation2MinDepth, daily2kkiEventLocation2MaxDepth, dailyEventLocation2Exp, false)
 		}
 	} else {
 		if !deeper {
-			addEventLocation(gameId, 0, dailyEventLocationExp, pools)
+			addEventLocation(gameId, 0, dailyEventLocationExp, false, pools)
 		} else {
-			addEventLocation(gameId, 0, dailyEventLocation2Exp, pools)
+			addEventLocation(gameId, 0, dailyEventLocation2Exp, false, pools)
 		}
 	}
 }
@@ -352,9 +369,9 @@ func addWeeklyEventLocation() {
 	}
 
 	if gameId == "2kki" {
-		add2kkiEventLocation(1, weekly2kkiEventLocationMinDepth, weekly2kkiEventLocationMaxDepth, weeklyEventLocationExp)
+		add2kkiEventLocation(1, weekly2kkiEventLocationMinDepth, weekly2kkiEventLocationMaxDepth, weeklyEventLocationExp, false)
 	} else {
-		addEventLocation(gameId, 1, weeklyEventLocationExp, gameWeeklyEventLocationPools)
+		addEventLocation(gameId, eventWeekly, weeklyEventLocationExp, false, gameWeeklyEventLocationPools)
 	}
 }
 
@@ -366,18 +383,17 @@ func addWeekendEventLocation() {
 	}
 
 	if gameId == "2kki" {
-		add2kkiEventLocation(2, weekend2kkiEventLocationMinDepth, weekend2kkiEventLocationMaxDepth, weekendEventLocationExp)
+		add2kkiEventLocation(eventWeekend, weekend2kkiEventLocationMinDepth, weekend2kkiEventLocationMaxDepth, weekendEventLocationExp, false)
 	} else {
-		addEventLocation(gameId, 2, weekendEventLocationExp, gameWeekendEventLocationPools)
+		addEventLocation(gameId, eventWeekend, weekendEventLocationExp, false, gameWeekendEventLocationPools)
 	}
 }
 
-func addEventLocation(gameId string, eventType int, exp int, pools map[string][]*EventLocationData) {
-	addPlayerEventLocation(gameId, eventType, exp, pools[gameId], "")
+func addEventLocation(gameId string, eventType EventType, exp int, timeTrial bool, pools map[string][]*EventLocationData) {
+	addPlayerEventLocation(gameId, eventType, exp, timeTrial, pools[gameId], "")
 }
 
-// eventType: 0 - daily, 1 - weekly, 2 - weekend, 3 - manual
-func addPlayerEventLocation(gameId string, eventType int, exp int, pool []*EventLocationData, playerUuid string) {
+func addPlayerEventLocation(gameId string, eventType EventType, exp int, timeTrial bool, pool []*EventLocationData, playerUuid string) {
 	eventLocation := pool[rand.Intn(len(pool))]
 
 	var gameEventPeriodId int
@@ -389,27 +405,27 @@ func addPlayerEventLocation(gameId string, eventType int, exp int, pool []*Event
 
 	var err error
 	if playerUuid == "" {
-		err = writeEventLocationData(gameId, gameEventPeriodId, eventType, eventLocation.Title, eventLocation.TitleJP, eventLocation.Depth, eventLocation.MinDepth, exp, eventLocation.MapIds)
+		err = writeEventLocationData(gameId, gameEventPeriodId, eventType, eventLocation.Title, eventLocation.TitleJP, eventLocation.Depth, eventLocation.MinDepth, exp, timeTrial, eventLocation.MapIds)
 	} else {
 		err = writePlayerEventLocationData(gameId, gameEventPeriodId, playerUuid, eventLocation.Title, eventLocation.TitleJP, eventLocation.Depth, eventLocation.MinDepth, eventLocation.MapIds)
 	}
 	if err != nil {
-		handleInternalEventError(eventType, err)
+		handleInternalEventError(int(eventType), err)
 	}
 }
 
-func add2kkiEventLocation(eventType int, minDepth int, maxDepth int, exp int) {
+func add2kkiEventLocation(eventType EventType, minDepth int, maxDepth int, exp int, timeTrial bool) {
 	var gameEventPeriodId int
 	if config.gameName == "2kki" {
 		gameEventPeriodId = currentGameEventPeriodId
 	} else {
 		gameEventPeriodId = gameCurrentEventPeriods["2kki"].Id
 	}
-	addPlayer2kkiEventLocation(gameEventPeriodId, eventType, minDepth, maxDepth, exp, "")
+	addPlayer2kkiEventLocation(gameEventPeriodId, eventType, minDepth, maxDepth, exp, timeTrial, "")
 }
 
 // eventType: 0 - daily, 1 - weekly, 2 - weekend, 3 - manual
-func addPlayer2kkiEventLocation(gameEventPeriodId int, eventType int, minDepth int, maxDepth int, exp int, playerUuid string) {
+func addPlayer2kkiEventLocation(gameEventPeriodId int, eventType EventType, minDepth int, maxDepth int, exp int, timeTrial bool, playerUuid string) {
 	url := "https://2kki.app/getRandomLocations?ignoreSecret=1&minDepth=" + strconv.Itoa(minDepth)
 	if maxDepth >= minDepth {
 		url += "&maxDepth=" + strconv.Itoa(maxDepth)
@@ -417,36 +433,36 @@ func addPlayer2kkiEventLocation(gameEventPeriodId int, eventType int, minDepth i
 
 	resp, err := http.Get(url)
 	if err != nil {
-		handleInternalEventError(eventType, err)
+		handleInternalEventError(int(eventType), err)
 		return
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		handleInternalEventError(eventType, err)
+		handleInternalEventError(int(eventType), err)
 		return
 	}
 
 	if strings.HasPrefix(string(body), "{\"error\"") {
-		handleEventError(eventType, "Invalid event location data: "+string(body))
+		handleEventError(int(eventType), "Invalid event location data: "+string(body))
 		return
 	}
 
 	var eventLocations []EventLocationData
 	err = json.Unmarshal(body, &eventLocations)
 	if err != nil {
-		handleInternalEventError(eventType, err)
+		handleInternalEventError(int(eventType), err)
 		return
 	}
 
 	for _, eventLocation := range eventLocations {
 		if playerUuid == "" {
-			err = writeEventLocationData("2kki", gameEventPeriodId, eventType, eventLocation.Title, eventLocation.TitleJP, eventLocation.Depth, eventLocation.MinDepth, exp, eventLocation.MapIds)
+			err = writeEventLocationData("2kki", gameEventPeriodId, eventType, eventLocation.Title, eventLocation.TitleJP, eventLocation.Depth, eventLocation.MinDepth, exp, timeTrial, eventLocation.MapIds)
 		} else {
 			err = writePlayerEventLocationData("2kki", gameEventPeriodId, playerUuid, eventLocation.Title, eventLocation.TitleJP, eventLocation.Depth, eventLocation.MinDepth, eventLocation.MapIds)
 		}
 		if err != nil {
-			handleInternalEventError(eventType, err)
+			handleInternalEventError(int(eventType), err)
 		}
 	}
 }
@@ -694,5 +710,18 @@ func setGameEventLocationPoolsAndLocationColors() {
 				freeEventLocationPool = append(freeEventLocationPool, eventLocation)
 			}
 		}
+	}
+}
+
+func addWeeklyEventTrial() {
+	gameId, err := getRandomGameForEventPool(gameWeeklyEventLocationPools, eventLocationCountWeeklyThreshold)
+	if err != nil {
+		handleInternalEventError(1, err)
+		return
+	}
+	if gameId == "2kki" {
+		add2kkiEventLocation(eventWeekly, weekly2kkiEventLocationMinDepth, weekly2kkiEventLocationMaxDepth, 0, true)
+	} else {
+
 	}
 }

@@ -1032,14 +1032,14 @@ func getOrWriteLocationIdForPlayerEventLocation(gameId string, gameEventPeriodId
 	return locationId, nil
 }
 
-func writeEventLocationData(gameId string, gameEventPeriodId int, eventType int, title string, titleJP string, depth int, minDepth int, exp int, mapIds []string) error {
+func writeEventLocationData(gameId string, gameEventPeriodId int, eventType EventType, title string, titleJP string, depth int, minDepth int, exp int, timeTrial bool, mapIds []string) error {
 	var days int
 	var offsetDays int
 	weekday := time.Now().UTC().Weekday()
 	switch eventType {
-	case 0:
+	case eventDaily:
 		days = 1
-	case 1:
+	case eventWeekly:
 		days = 7
 		offsetDays = int(weekday)
 	default:
@@ -1058,7 +1058,7 @@ func writeEventLocationData(gameId string, gameEventPeriodId int, eventType int,
 		return err
 	}
 
-	_, err = db.Exec("INSERT INTO eventLocations (locationId, gamePeriodId, type, exp, startDate, endDate) VALUES (?, ?, ?, ?, DATE_SUB(UTC_DATE(), INTERVAL ? DAY), DATE_ADD(UTC_DATE(), INTERVAL ? DAY))", locationId, gameEventPeriodId, eventType, exp, offsetDays, days)
+	_, err = db.Exec("INSERT INTO eventLocations (locationId, gamePeriodId, type, exp, timeTrial, startDate, endDate) VALUES (?, ?, ?, ?, DATE_SUB(UTC_DATE(), INTERVAL ? DAY), DATE_ADD(UTC_DATE(), INTERVAL ? DAY))", locationId, gameEventPeriodId, eventType, exp, timeTrial, offsetDays, days)
 	if err != nil {
 		return err
 	}
